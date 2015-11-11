@@ -1,155 +1,105 @@
-/**
- *  Copyright (c) 2015, Facebook, Inc.
- *  All rights reserved.
- *
- *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant
- *  of patent rights can be found in the PATENTS file in the same directory.
- */
+/* @flow */
 
 import {
-  GraphQLBoolean,
-  GraphQLFloat,
+  GraphQLObjectType,
   GraphQLID,
+  GraphQLString,
   GraphQLInt,
   GraphQLList,
   GraphQLNonNull,
-  GraphQLObjectType,
   GraphQLSchema,
-  GraphQLString,
 } from 'graphql';
 
-import {
-  connectionArgs,
-  connectionDefinitions,
-  connectionFromArray,
-  fromGlobalId,
-  globalIdField,
-  mutationWithClientMutationId,
-  nodeDefinitions,
-} from 'graphql-relay';
-
-import {
-  Game,
-  HidingSpot,
-  checkHidingSpotForTreasure,
-  getGame,
-  getHidingSpot,
-  getHidingSpots,
-  getTurnsRemaining,
-} from './database';
-
-var {nodeInterface, nodeField} = nodeDefinitions(
-  (globalId) => {
-  var {type, id} = fromGlobalId(globalId);
-if (type === 'Game') {
-  return getGame(id);
-} else if (type === 'HidingSpot') {
-  return getHidingSpot(id);
-} else {
-  return null;
-}
-},
-(obj) => {
-  if (obj instanceof Game) {
-    return gameType;
-  } else if (obj instanceof HidingSpot)  {
-    return hidingSpotType;
-  } else {
-    return null;
-  }
-}
-);
-
-var gameType = new GraphQLObjectType({
-  name: 'Game',
-  description: 'A treasure search game',
+const entryType = new GraphQLObjectType({
+  name: 'RssEntry',
+  description: 'RssEntry type',
   fields: () => ({
-    id: globalIdField('Game'),
-    hidingSpots: {
-      type: hidingSpotConnection,
-      description: 'Places where treasure might be hidden',
-      args: connectionArgs,
-      resolve: (game, args) => connectionFromArray(getHidingSpots(), args),
+    id: {
+      type: new GraphQLNonNull(GraphQLID),
+      description: 'id',
     },
-    turnsRemaining: {
-      type: GraphQLInt,
-      description: 'The number of turns a player has left to find the treasure',
-      resolve: () => getTurnsRemaining(),
+    title: {
+      type: new GraphQLNonNull(GraphQLString),
+      description: 'title',
     },
   }),
-  interfaces: [nodeInterface],
 });
 
-var hidingSpotType = new GraphQLObjectType({
-  name: 'HidingSpot',
-  description: 'A place where you might find treasure',
+const feedType = new GraphQLObjectType({
+  name: 'RssFeed',
+  description: 'RssFeed type',
   fields: () => ({
-    id: globalIdField('HidingSpot'),
-    hasBeenChecked: {
-      type: GraphQLBoolean,
-      description: 'True if this spot has already been checked for treasure',
-      resolve: (hidingSpot) => hidingSpot.hasBeenChecked,
+    id: {
+      type: new GraphQLNonNull(GraphQLID),
     },
-    hasTreasure: {
-      type: GraphQLBoolean,
-      description: 'True if this hiding spot holds treasure',
-      resolve: (hidingSpot) => {
-        if (hidingSpot.hasBeenChecked) {
-          return hidingSpot.hasTreasure;
-        } else {
-          return null;  // Shh... it's a secret!
-        }
+    name: {
+      type: GraphQLString,
+    },
+    entries: {
+      type: new GraphQLList(entryType),
+      args: {
+        count: {
+          name: 'count',
+          type: GraphQLInt,
+        },
+      },
+      resolve: (feed, params, { rootValue: root }) => {
+        const entries = feed.entries.map(id => root.Entry[id]);
+        return params.count ? entries.slice(0, params.count) : entries;
       },
     },
   }),
-  interfaces: [nodeInterface],
 });
 
-var {connectionType: hidingSpotConnection} =
-  connectionDefinitions({name: 'HidingSpot', nodeType: hidingSpotType});
-
-var queryType = new GraphQLObjectType({
-  name: 'Query',
+var feedListType = new GraphQLObjectType({
+  name: 'FeedList',
+  description: 'feed list',
   fields: () => ({
-    node: nodeField,
-    game: {
-      type: gameType,
-      resolve: () => getGame(),
+    feeds: {
+      type: new GraphQLList(feedType),
+      args: {
+        count: {
+          name: 'count',
+          type: GraphQLInt,
+        },
+      },
+      resolve: (feed, params, { rootValue: root }) => {
+        const entries = feed.entries.map(id => root.Entry[id]);
+        return params.count ? entries.slice(0, params.count) : entries;
+      },
     },
   }),
 });
 
-var CheckHidingSpotForTreasureMutation = mutationWithClientMutationId({
-  name: 'CheckHidingSpotForTreasure',
-  inputFields: {
-    id: { type: new GraphQLNonNull(GraphQLID) },
-  },
-  outputFields: {
-    hidingSpot: {
-      type: hidingSpotType,
-      resolve: ({localHidingSpotId}) => getHidingSpot(localHidingSpotId),
-    },
-    game: {
-      type: gameType,
-      resolve: () => getGame(),
-    },
-  },
-  mutateAndGetPayload: ({id}) => {
-    var localHidingSpotId = fromGlobalId(id).id;
-    checkHidingSpotForTreasure(localHidingSpotId);
-    return {localHidingSpotId};
-  },
-});
-
-var mutationType = new GraphQLObjectType({
-  name: 'Mutation',
-  fields: () => ({
-    checkHidingSpotForTreasure: CheckHidingSpotForTreasureMutation,
+export const Schema = new GraphQLSchema({
+  query: new GraphQLObjectType({
+    name: 'Query',
+    fields: () => ({
+      feeds: {
+        type: feedListType,
+        resolve: (root) => {
+          return root.Feed['u-1'];
+        },
+      },
+    }),
+  }),
+  mutation: new GraphQLObjectType({
+    name: 'Mutation',
+    fields: () => ({
+      createTodo: {
+        type: feedType,
+        args: {
+          url: {
+            name: 'url',
+            type: GraphQLString,
+          },
+        },
+        resolve: (root, params) => {
+          return root.createFeed(params);
+        },
+      },
+    }),
   }),
 });
 
-export var Schema = new GraphQLSchema({
-  query: queryType,
-  mutation: mutationType
-});
+export default Schema;
