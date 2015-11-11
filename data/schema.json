@@ -15,7 +15,7 @@
           "description": null,
           "fields": [
             {
-              "name": "feeds",
+              "name": "feedList",
               "description": null,
               "args": [],
               "type": {

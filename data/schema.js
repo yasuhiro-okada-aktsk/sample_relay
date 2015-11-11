@@ -75,7 +75,7 @@ export const Schema = new GraphQLSchema({
   query: new GraphQLObjectType({
     name: 'Query',
     fields: () => ({
-      feeds: {
+      feedList: {
         type: feedListType,
         resolve: (root) => {
           return root.Feed['u-1'];
