@@ -35,28 +35,12 @@ const feedType = new GraphQLObjectType({
     name: {
       type: GraphQLString,
     },
+    author: {
+      type: new GraphQLNonNull(GraphQLString),
+      description: 'author',
+    },
     entries: {
       type: new GraphQLList(entryType),
-      args: {
-        count: {
-          name: 'count',
-          type: GraphQLInt,
-        },
-      },
-      resolve: (feed, params, { rootValue: root }) => {
-        const entries = feed.entries.map(id => root.Entry[id]);
-        return params.count ? entries.slice(0, params.count) : entries;
-      },
-    },
-  }),
-});
-
-var feedListType = new GraphQLObjectType({
-  name: 'FeedList',
-  description: 'feed list',
-  fields: () => ({
-    feeds: {
-      type: new GraphQLList(feedType),
       args: {
         count: {
           name: 'count',
@@ -75,10 +59,13 @@ export const Schema = new GraphQLSchema({
   query: new GraphQLObjectType({
     name: 'Query',
     fields: () => ({
-      feedList: {
-        type: feedListType,
-        resolve: (root) => {
-          return root.Feed['u-1'];
+      feeds: {
+        type: new GraphQLList(feedType),
+        args: {
+          count: {
+            name: 'count',
+            type: GraphQLInt,
+          },
         },
       },
     }),
