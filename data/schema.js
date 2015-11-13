@@ -47,10 +47,6 @@ const feedType = new GraphQLObjectType({
           type: GraphQLInt,
         },
       },
-      resolve: (feed, params, { rootValue: root }) => {
-        const entries = feed.entries.map(id => root.Entry[id]);
-        return params.count ? entries.slice(0, params.count) : entries;
-      },
     },
   }),
 });
@@ -80,9 +76,6 @@ export const Schema = new GraphQLSchema({
             name: 'url',
             type: GraphQLString,
           },
-        },
-        resolve: (root, params) => {
-          return root.createFeed(params);
         },
       },
     }),
